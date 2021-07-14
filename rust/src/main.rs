@@ -1,6 +1,9 @@
 
 use std::convert::TryInto;
 
+extern crate rand;
+use rand::Rng;
+
 #[derive(Clone, Copy)]
 pub struct Cell {
     north: bool,
@@ -17,7 +20,7 @@ pub struct Maze {
     current: (usize, usize)
 }
 
-pub fn NewMaze(rows: usize, columns: usize) -> Maze {
+pub fn new_maze(rows: usize, columns: usize) -> Maze {
     return Maze {
         rows,
         columns,
@@ -57,6 +60,17 @@ impl Maze {
             }
             println!("{}", line);
             line.clear();
+            line.push('+');
+            for x in 0..self.columns {
+                if self.cell_at(x,y).south {
+                    line.push(' ');
+                } else {
+                    line.push('-');
+                }
+                line.push('+');
+            }
+            println!("{}", line);
+            line.clear();
         }
         self.draw_horizontal();
     }
@@ -75,9 +89,40 @@ impl Maze {
         return self.cells[y*self.columns+x];
     }
 
+    fn open_cell_east(&mut self, x: usize, y: usize) {
+        self.cells[y*self.columns+x].east = true;
+        self.cells[y*self.columns+x+1].west = true;
+    }
+
+    fn open_cell_north(&mut self, x: usize, y: usize) {
+        self.cells[y*self.columns+x].north = true;
+        self.cells[(y-1)*self.columns+x].south = true;
+    }
+
+    pub fn populate_binary_tree(&mut self) {
+        let mut rng = rand::thread_rng();
+        let mut flip_coin = || {
+            return rng.gen_range(0..2) == 1
+        };
+        for y in (0..self.rows).rev() {
+            for x in (0..self.columns).rev() {
+                if flip_coin() {
+                    if y > 0 {
+                        self.open_cell_north(x, y);
+                    }
+                } else {
+                    if x < self.columns - 1 {
+                        self.open_cell_east(x, y);
+                    }
+                }
+            }
+        }
+    }
+
 }
 
 fn main() {
-    let maze = NewMaze(15, 15);
+    let mut maze = new_maze(15, 15);
+    maze.populate_binary_tree();
     maze.print();
 }
