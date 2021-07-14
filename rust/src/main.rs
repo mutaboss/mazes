@@ -95,14 +95,32 @@ impl Maze {
     }
 
     fn open_cell_east(&mut self, x: usize, y: usize) {
-        self.cells[y*self.columns+x].east = true;
-        self.cells[y*self.columns+x+1].west = true;
+        if x < self.columns - 1 {
+            self.cells[y*self.columns+x].east = true;
+            self.cells[y*self.columns+x+1].west = true;
+        }
     }
 
     fn open_cell_north(&mut self, x: usize, y: usize) {
-        self.cells[y*self.columns+x].north = true;
-        self.cells[(y-1)*self.columns+x].south = true;
+        if y > 0 {
+            self.cells[y*self.columns+x].north = true;
+            self.cells[(y-1)*self.columns+x].south = true;
+        }
     }
+
+    // fn open_cell_west(&mut self, x: usize, y: usize) {
+    //     self.cells[y*self.columns+x].west = true;
+    //     if x > 0 {
+    //         self.cells[y*self.columns+x-1].east = true;
+    //     }
+    // }
+
+    // fn open_cell_south(&mut self, x: usize, y:usize) {
+    //     self.cells[y*self.columns+x].south = true;
+    //     if y < self.rows - 1 {
+    //         self.cells[(y+1)*self.columns+x].north = true;
+    //     }
+    // }
 
     pub fn populate_binary_tree(&mut self) {
         let mut rng = rand::thread_rng();
@@ -111,19 +129,17 @@ impl Maze {
         };
         for y in (0..self.rows).rev() {
             for x in (0..self.columns).rev() {
-                if y > 0 {
-                    if x < self.columns - 1 {
+                if y == 0 {
+                    self.open_cell_east(x, y);
+                } else {
+                    if x == self.columns - 1 {
+                        self.open_cell_north(x, y);
+                    } else {
                         if flip_coin() {
                             self.open_cell_north(x, y);
                         } else {
                             self.open_cell_east(x, y);
                         }
-                    } else {
-                        self.open_cell_north(x, y);
-                    }
-                } else {
-                    if x < self.columns - 1 {
-                        self.open_cell_east(x, y);
                     }
                 }
             }
@@ -133,6 +149,7 @@ impl Maze {
 }
 
 // TODO: Add command line parameters for maze size.
+// TODO: Add bounds checking to open_cell_*.
 
 fn main() {
     let mut maze = new_maze(15, 15);
