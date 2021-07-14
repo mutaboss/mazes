@@ -15,9 +15,7 @@ pub struct Cell {
 pub struct Maze {
     rows: usize,
     columns: usize,
-    cells: Vec<Cell>,
-    origin: (usize, usize),
-    current: (usize, usize)
+    cells: Vec<Cell>
 }
 
 pub fn new_maze(rows: usize, columns: usize) -> Maze {
@@ -25,9 +23,7 @@ pub fn new_maze(rows: usize, columns: usize) -> Maze {
         rows,
         columns,
         cells: vec![Cell{north: false, south: false, east: false, west: false};
-                    (rows*columns).try_into().unwrap()],
-        origin: (0,0),
-        current: (0,0)
+                    (rows*columns).try_into().unwrap()]
     }
 }
 
@@ -47,11 +43,18 @@ impl Maze {
     //         2. Else, print a space.
     pub fn print(&self) {
         let mut line = String::new();
+        line.push_str("     ");
+        for x in 0..self.columns {
+            line.push_str(&format!("{:>3} ", x+1));
+        }
+        println!("{}", line);
+        line.clear();
         self.draw_horizontal();
         for y in 0..self.rows {
+            line.push_str(&format!("{:>3} ", y+1));
             line.push('|');
             for x in 0..self.columns {
-                line.push(' ');
+                line.push_str("   ");
                 if self.cell_at(x,y).east {
                     line.push(' ');
                 } else {
@@ -60,28 +63,30 @@ impl Maze {
             }
             println!("{}", line);
             line.clear();
-            line.push('+');
-            for x in 0..self.columns {
-                if self.cell_at(x,y).south {
-                    line.push(' ');
-                } else {
-                    line.push('-');
+            if y < self.rows - 1 {
+                line.push_str("    +");
+                for x in 0..self.columns {
+                    if self.cell_at(x,y).south {
+                        line.push_str("   ");
+                    } else {
+                        line.push_str("---");
+                    }
+                    line.push('+');
                 }
-                line.push('+');
+                println!("{}", line);
+                line.clear();
             }
-            println!("{}", line);
-            line.clear();
         }
         self.draw_horizontal();
     }
     
     fn draw_horizontal(&self) {
         let mut line = String::new();
-        line.push_str("+-");
+        line.push_str("    +-");
         for _x in 1..self.columns {
-            line.push_str("--");
+            line.push_str("--+-");
         }
-        line.push('+');
+        line.push_str("--+");
         println!("{}", line);
     }
 
@@ -106,8 +111,14 @@ impl Maze {
         };
         for y in (0..self.rows).rev() {
             for x in (0..self.columns).rev() {
-                if flip_coin() {
-                    if y > 0 {
+                if y > 0 {
+                    if x < self.columns - 1 {
+                        if flip_coin() {
+                            self.open_cell_north(x, y);
+                        } else {
+                            self.open_cell_east(x, y);
+                        }
+                    } else {
                         self.open_cell_north(x, y);
                     }
                 } else {
@@ -120,6 +131,8 @@ impl Maze {
     }
 
 }
+
+// TODO: Add command line parameters for maze size.
 
 fn main() {
     let mut maze = new_maze(15, 15);
