@@ -1,0 +1,9 @@
+[package]
+name = "mazes"
+version = "0.1.0"
+edition = "2018"
+authors = ["Brian P King <brian@jenashcal.net>"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
