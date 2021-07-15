@@ -4,6 +4,9 @@ use std::convert::TryInto;
 extern crate rand;
 use rand::Rng;
 
+extern crate clap;
+use clap::{Arg, App};
+
 #[derive(Clone, Copy)]
 pub struct Cell {
     north: bool,
@@ -124,11 +127,9 @@ impl Maze {
 
     pub fn populate_binary_tree(&mut self) {
         let mut rng = rand::thread_rng();
-        let mut flip_coin = || {
-            return rng.gen_range(0..2) == 1
-        };
+        let mut flip_coin = || {return rng.gen_range(0..2) == 1};
         for y in (0..self.rows).rev() {
-            for x in (0..self.columns).rev() {
+            for x in 0..self.columns {
                 if y == 0 {
                     self.open_cell_east(x, y);
                 } else {
@@ -146,13 +147,101 @@ impl Maze {
         }
     }
 
+    fn select_sidewinder_run(&self, x: usize, y: usize) -> Vec<(usize, usize)> {
+        let mut result = vec![(x,y)];
+        let mut x = x;
+        let y = y;
+        while self.cell_at(x,y).west {
+            println!("adding cell to the west");
+            x = x - 1;
+            result.push((x, y));
+        }
+        return result;
+    }
+
+    fn open_sidewinder_north(&mut self, x: usize, y: usize) {
+        let run = self.select_sidewinder_run(x, y);
+        let mut rng = rand::thread_rng();
+        let cell = run[rng.gen_range(0..run.len())];
+        self.open_cell_north(cell.0, cell.1);
+    }
+
+    pub fn populate_sidewinder(&mut self) {
+        let mut rng = rand::thread_rng();
+        let mut flip_coin = || {return rng.gen_range(0..2) == 1};
+        for y in (0..self.rows).rev() {
+            for x in 0..self.columns {
+                if y == 0 {
+                    self.open_cell_east(x, y);
+                } else {
+                    if x == self.columns - 1 {
+                        self.open_sidewinder_north(x, y);
+                    } else {
+                        if flip_coin() {
+                            self.open_sidewinder_north(x, y);
+                        } else {
+                            self.open_cell_east(x, y);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
-// TODO: Add command line parameters for maze size.
-// TODO: Add bounds checking to open_cell_*.
+fn parse_number(name: &str, value: Option<&str>, default: usize) -> usize {
+    match value {
+        None => default,
+        Some(s) => {
+            match s.parse::<usize>() {
+                Ok(n) => n,
+                Err(_) => {
+                    println!("{}={}. Not a positive integer.", name, s);
+                    default
+                }
+            }
+        }
+    }
+}
 
 fn main() {
-    let mut maze = new_maze(15, 15);
-    maze.populate_binary_tree();
+    let matches = App::new("mazes")
+        .version("1.0")
+        .author("Brian P King")
+        .about("Generates random mazes.")
+        .arg(Arg::with_name("columns")
+             .short("c")
+             .long("columns")
+             .value_name("COLUMNS")
+             .help("Specify the number of columns in the maze (default 15).")
+             .takes_value(true))
+        .arg(Arg::with_name("rows")
+             .short("r")
+             .long("rows")
+             .value_name("ROWS")
+             .help("Specify the number of rows in the maze (default 15).")
+             .takes_value(true))
+        .arg(Arg::with_name("sidewinder")
+             .long("sidewinder")
+             .help("Use the Sidewinder algorithm instead of the default Binary Tree.")
+             .takes_value(false))
+        .get_matches();
+    let columns = parse_number("columns", matches.value_of("columns"), 15);
+    let rows = parse_number("rows", matches.value_of("rows"), 15);
+    let algorithm = {
+        if matches.is_present("sidewinder") {
+            println!("selected the sidewinder algorithm.");
+            "sidewinder"
+        } else {
+            println!("selected the binary algorithm.");
+            "binary"
+        }
+    };
+    let mut maze = new_maze(rows, columns);
+    if algorithm == "binary" {
+        maze.populate_binary_tree();
+    } else {
+        maze.populate_sidewinder();
+    }
     maze.print();
 }
