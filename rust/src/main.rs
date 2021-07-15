@@ -125,6 +125,7 @@ impl Maze {
     //     }
     // }
 
+    // MAZE ALGORITHM: Binary Tree
     pub fn populate_binary_tree(&mut self) {
         let mut rng = rand::thread_rng();
         let mut flip_coin = || {return rng.gen_range(0..2) == 1};
@@ -147,12 +148,12 @@ impl Maze {
         }
     }
 
+    // MAZE ALGORITHM: Sidewinder
     fn select_sidewinder_run(&self, x: usize, y: usize) -> Vec<(usize, usize)> {
         let mut result = vec![(x,y)];
         let mut x = x;
         let y = y;
         while self.cell_at(x,y).west {
-            println!("adding cell to the west");
             x = x - 1;
             result.push((x, y));
         }
@@ -230,13 +231,12 @@ fn main() {
     let rows = parse_number("rows", matches.value_of("rows"), 15);
     let algorithm = {
         if matches.is_present("sidewinder") {
-            println!("selected the sidewinder algorithm.");
             "sidewinder"
         } else {
-            println!("selected the binary algorithm.");
             "binary"
         }
     };
+    println!("You sselected the {} algorithm.", algorithm);
     let mut maze = new_maze(rows, columns);
     if algorithm == "binary" {
         maze.populate_binary_tree();
