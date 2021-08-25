@@ -1,10 +1,16 @@
 use clap::{App, Arg};
-//use cursive::views::{BoxedView, NamedView, TextView};
+use cursive::view::Resizable;
 
 mod maze {
 
     use rand::Rng;
     use std::convert::TryInto;
+
+    #[derive(Debug)]
+    pub enum Algorithm {
+        Binary,
+        Sidewinder,
+    }
 
     #[derive(Clone, Copy)]
     pub struct Cell {
@@ -29,15 +35,31 @@ mod maze {
         rows: usize,
         columns: usize,
         cells: Vec<Cell>,
+        algorithm: Algorithm,
     }
 
     impl Maze {
         pub fn new(rows: usize, columns: usize) -> Self {
             return Maze {
-                rows,
-                columns,
+                rows: rows,
+                columns: columns,
                 cells: vec![Cell::new(); (rows * columns).try_into().unwrap()],
+                algorithm: Algorithm::Binary,
             };
+        }
+
+        pub fn clear(&mut self) {
+            self.cells = vec![Cell::new(); (self.rows * self.columns).try_into().unwrap()];
+        }
+
+        pub fn set_size(&mut self, new_rows: usize, new_columns: usize) {
+            self.rows = new_rows;
+            self.columns = new_columns;
+            self.clear();
+        }
+        pub fn set_algorithm(&mut self, new_algorithm: Algorithm) {
+            self.algorithm = new_algorithm;
+            self.clear();
         }
 
         // print: Print the maze to a String.
@@ -125,7 +147,7 @@ mod maze {
         // }
 
         // MAZE ALGORITHM: Binary Tree
-        pub fn populate_binary_tree(&mut self) {
+        fn populate_binary_tree(&mut self) {
             let mut rng = rand::thread_rng();
             let mut flip_coin = || return rng.gen_range(0..2) == 1;
             for y in (0..self.rows).rev() {
@@ -166,7 +188,7 @@ mod maze {
             self.open_cell_north(cell.0, cell.1);
         }
 
-        pub fn populate_sidewinder(&mut self) {
+        fn populate_sidewinder(&mut self) {
             let mut rng = rand::thread_rng();
             let mut flip_coin = || return rng.gen_range(0..2) == 1;
             for y in (0..self.rows).rev() {
@@ -187,27 +209,53 @@ mod maze {
                 }
             }
         }
+
+        pub fn populate(&mut self) {
+            match self.algorithm {
+                Algorithm::Binary => self.populate_binary_tree(),
+                Algorithm::Sidewinder => self.populate_sidewinder(),
+            };
+        }
     }
 }
 
-// pub struct MazeView {
-//     buffer: String
-// }
+mod mazeui {
 
-// impl MazeView {
-//     pub fn new() -> Self {
-//         MazeView { String::new() }
-//     }
-// }
-
-// impl View for MazeView {
-//     pub fn layout(&mut self, size XY<usize>) {
-//     }
-//     pub fn draw(&self, printer: &Printer) {
-//         self.clear();
-//         printer.print(0, self.buffer);
-//     }
-// }
+    use crate::maze;
+    use cursive::{View,XY,Printer};
+    
+    pub struct MazeView {
+        maze: maze::Maze,
+    }
+    
+    impl MazeView {
+        pub fn new() -> Self {
+            MazeView { maze: maze::Maze::new(10,10) }
+        }
+    }
+    
+    impl View for MazeView {
+        fn layout(&mut self, size: XY::<usize>) {
+            let (x,y) = size.pair();
+            // FIXME: Each row takes 2 lines, plus 2 lines at the top.
+            //        Each column takes 4 characters, plus 2 characters at the left.
+            //        The top and left columns subtract only 1 from maze size.
+            // FIXME: Calculate for odd sizes rows/columns.
+            self.maze.set_size(y/2-1, x/4-1);
+            self.maze.populate();
+            eprintln!("\nlayout: ({},{}).\n", y, x);
+        }
+        fn draw(&self, printer: &Printer) {
+            //printer.print((0,0), &format!("({},{}", self.y, self.x));
+            let mut y = 1;
+            for line in self.maze.to_string().lines() {
+                printer.print((0,y), line);
+                y = y + 1;
+            }
+        }
+    }
+    
+}
 
 // *********************************************************************************************
 // MAIN
@@ -251,9 +299,9 @@ fn main() {
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("draw")
-                .long("draw")
-                .help("Draw the maze to the screen (do not use the UI).")
+            Arg::with_name("tui")
+                .long("tui")
+                .help("Use dialog-based management.")
                 .takes_value(false),
         )
         .arg(
@@ -269,51 +317,50 @@ fn main() {
                 .takes_value(false),
         )
         .get_matches();
-    if matches.is_present("draw") {
+    if !matches.is_present("tui") {
         let columns = parse_number("columns", matches.value_of("columns"), 15);
         let rows = parse_number("rows", matches.value_of("rows"), 15);
-        let algorithm = {
-            if matches.is_present("sidewinder") {
-                "sidewinder"
-            } else {
-                "binary"
-            }
-        };
         let mut maze = maze::Maze::new(rows, columns);
-        if algorithm == "binary" {
-            maze.populate_binary_tree();
-        } else {
-            maze.populate_sidewinder();
+        if matches.is_present("sidewinder") {
+            maze.set_algorithm(maze::Algorithm::Sidewinder);
         }
+        maze.populate();
         print!("{}", maze.to_string());
     } else {
-        println!("{}", String::from("Not yet implemented."));
-        // let mut siv = cursive::default();
-        // siv.add_global_callback('q', |s| s.quit());
-        // siv.add_fullscreen_layer(NamedView::new("box",
-        //                                         BoxView::with_full_screen(NamedView::new("maze",
-        //                                                                                  TextView::empty()))));
-        // let mut maze = maze::Maze::new(width, height);
-        // if algorithm == "binary" {
-        //     maze.populate_binary_tree();
-        // } else {
-        //     maze.populate_sidewinder();
-        // }
-        // siv.call_on_name("maze", |view: &mut TextView| {
-        //     view.set_content(maze.to_string());
-        // });
-        // siv.run();
+        let mut siv = cursive::default();
+        siv.add_global_callback('q', |s| s.quit());
+        siv.add_layer(mazeui::MazeView::new().full_screen());
+        siv.run();
     }
 }
 
-/* WITH CURSIVE!
- * For this to work, the TUI will need to drive the maze, not the surrounding program.  MazeView
- * will need to contain its own maze. The size of the maze will fit the available space within
- * the screen. The algorithm selection will be driven by TUI dialogs.  Should we have a maze on
- * startup, or have a print option to drive redrawing the maze?  Redrawing would indicate
- * repopulating. We also want to be able to draw other characters at specific locations. How is
- * that managed? I need to wrap this up with various elements, such as a player and enemy.
+/*
+ * # FUTURE DIRECTIONS:
+ *
+ * These constitute changes to be made to the overall structure of the program.
+ *
+ * # WITH CURSIVE!
+ *
+ * By default, we draw to the screen, but we have the option for a TUI. For this to work, the
+ * TUI will need to drive the maze, not the surrounding program.  MazeView will need to contain
+ * its own maze. The size of the maze will fit the available space within the screen. The
+ * algorithm selection will be driven by TUI dialogs.  Should we have a maze on startup, or have
+ * a print option to drive redrawing the maze?  Redrawing would indicate repopulating. We also
+ * want to be able to draw other characters at specific locations. How is that managed? I need
+ * to wrap this up with various elements, such as a player and enemy.
+ *
+ * # MAZE CHANGES
  *
  * The maze needs to be made more homogenous, so we do not need to know what type of maze we are
- * populating.
+ * populating. I don't think we want to replace the entire maze value every time we switch
+ * algorithms, so instead we need to be able to select an algorithm, and branch off of that
+ * selection.  That requires an enum to constrain the types we allow, and some code to convert
+ * from text to enum.
+ *
+ * # NAVIGATORS
+ *
+ * For the player and the opponent, do we embed them in the maze data structure, or place them
+ * on top of it?  If we embed them we can easily include them during the drawing phase. If they
+ * are separate, we will need to include them somehow by modifying the String result from
+ * converting the maze to a string.
  */
